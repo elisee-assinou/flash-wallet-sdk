@@ -3,6 +3,7 @@ use crate::shared::errors::DomainError;
 use crate::contexts::conversion::domain::{
     value_objects::{
         satoshis::Satoshis,
+        xof_amount::XofAmount,
         momo_number::MomoNumber,
     },
     services::conversion_service::ConversionService,
@@ -38,25 +39,25 @@ impl AutoConvertUseCase {
         // 2. Applique le ratio de conversion
         let sats_to_convert = sats.apply_ratio(input.convert_ratio)?;
 
-        // 3. Récupère le taux de vente depuis Flash
-        let sell_rate = self.flash_gateway.get_sell_rate().await?;
+        // 3. Estime le montant XOF (taux fixe pour l'estimation)
+        // Le taux réel sera dans la réponse Flash
+        let estimated_xof = XofAmount::new(
+            (sats_to_convert.amount() as f64 / 100_000_000.0 * 36_456_183.0) as u64
+        )?;
 
-        // 4. Calcule le montant XOF
-        let xof_amount = ConversionService::sats_to_xof(&sats_to_convert, sell_rate)?;
-
-        // 5. Crée la transaction Flash
+        // 4. Crée la transaction Flash
         let transaction = self.flash_gateway
-            .create_sell_transaction(&xof_amount, &momo)
+            .create_sell_transaction(&estimated_xof, &momo)
             .await?;
 
-        // 6. Sauvegarde
+        // 5. Sauvegarde
         self.transaction_repo.save(&transaction).await?;
 
-        // 7. Retourne le résultat
+        // 6. Retourne le résultat
         Ok(AutoConvertOutput {
             transaction_id: transaction.id().value(),
             amount_sats: sats_to_convert.amount(),
-            amount_xof: xof_amount.amount(),
+            amount_xof: transaction.amount_xof().amount(),
             status: "PENDING".to_string(),
         })
     }
