@@ -8,4 +8,5 @@ pub trait WalletConfigRepository: Send + Sync {
     async fn find(&self) -> Result<Option<WalletConfig>, DomainError>;
     async fn find_all(&self) -> Result<Vec<WalletConfig>, DomainError>;
     async fn find_by_momo_number(&self, momo_number: &str) -> Result<Option<WalletConfig>, DomainError>;
+    async fn find_by_username(&self, username: &str) -> Result<Option<WalletConfig>, DomainError>;
 }

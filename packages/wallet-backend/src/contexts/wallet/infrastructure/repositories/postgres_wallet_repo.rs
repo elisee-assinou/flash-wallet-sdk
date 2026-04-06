@@ -88,4 +88,17 @@ impl WalletConfigRepository for PostgresWalletRepo {
 
         Ok(row.map(|r| Self::map_row(r.lightning_address, r.momo_number, r.convert_ratio)))
     }
+
+    async fn find_by_username(&self, username: &str) -> Result<Option<WalletConfig>, DomainError> {
+        let pattern = format!("{}@%", username);
+        let row = sqlx::query!(
+            r#"SELECT * FROM wallet_config WHERE lightning_address LIKE $1 LIMIT 1"#,
+            pattern
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::ExternalService(e.to_string()))?;
+
+        Ok(row.map(|r| Self::map_row(r.lightning_address, r.momo_number, r.convert_ratio)))
+    }
 }

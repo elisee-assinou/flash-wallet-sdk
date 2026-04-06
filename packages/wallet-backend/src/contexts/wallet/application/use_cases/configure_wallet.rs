@@ -19,10 +19,22 @@ impl ConfigureWalletUseCase {
         Self { wallet_repo }
     }
 
+    fn validate_lightning_address(address: &str) -> Result<(), DomainError> {
+        let parts: Vec<&str> = address.split('@').collect();
+        if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+            return Err(DomainError::InvalidValue(
+                "Invalid Lightning Address format. Expected: username@domain".to_string()
+            ));
+        }
+        Ok(())
+    }
+
     pub async fn execute(
         &self,
         input: ConfigureWalletInput,
     ) -> Result<ConfigureWalletOutput, DomainError> {
+        Self::validate_lightning_address(&input.lightning_address)?;
+
         let momo = MomoNumber::new(input.momo_number.clone())?;
 
         let config = WalletConfig::new(

@@ -32,6 +32,8 @@ use contexts::wallet::{
     presentation::routes::wallet_routes::wallet_router,
 };
 use contexts::lightning::infrastructure::lnd::LndClient;
+use contexts::lightning::presentation::routes::lnurlp_routes::lnurlp_router;
+use contexts::lightning::presentation::handlers::lnurlp_handler::LnurlpState;
 use contexts::lightning::application::use_cases::auto_convert_listener::AutoConvertListener;
 
 fn install_crypto() {
@@ -73,13 +75,22 @@ async fn main() {
     let wallet_repo = Arc::new(PostgresWalletRepo::new(pool.clone()));
 
     // LND Client
-    let lnd_client = LndClient::connect(
+    // Client LND pour les invoices (LNURL-pay)
+    let lnd_invoice_client = LndClient::connect(
         &lnd_host,
         &lnd_tls_cert,
         &lnd_macaroon,
     ).await.expect("Failed to connect to LND");
 
-    let lnd_client = Arc::new(tokio::sync::Mutex::new(lnd_client));
+    let lnd_invoice_client = Arc::new(tokio::sync::Mutex::new(lnd_invoice_client));
+
+    // Client LND séparé pour le listener
+    let lnd_listener_client = LndClient::connect(
+        &lnd_host,
+        &lnd_tls_cert,
+        &lnd_macaroon,
+    ).await.expect("Failed to connect to LND listener");
+    let lnd_listener_client = Arc::new(tokio::sync::Mutex::new(lnd_listener_client));
     tracing::info!(" Connected to LND (carol)");
 
     // Conversion use cases
@@ -107,10 +118,10 @@ async fn main() {
     let listener = AutoConvertListener::new(
         auto_convert_use_case.clone(),
         wallet_repo.clone(),
-        lnd_client.clone(),
+        lnd_invoice_client.clone(),
     );
     let listener = Arc::new(listener);
-    let lnd_for_listener = lnd_client.clone();
+    let lnd_for_listener = lnd_listener_client.clone();
 
     tokio::spawn(async move {
         tracing::info!(" Starting invoice listener...");
@@ -141,6 +152,11 @@ async fn main() {
             list_transactions_use_case,
         ))
         .merge(wallet_router(configure_wallet_use_case, get_wallet_use_case))
+        .merge(lnurlp_router(LnurlpState {
+            wallet_repo: wallet_repo.clone(),
+            lnd_client: lnd_invoice_client.clone(),
+            base_url: std::env::var("SERVER_BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string()),
+        }))
         .layer(cors)
         .layer(TraceLayer::new_for_http());
 
