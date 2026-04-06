@@ -128,4 +128,22 @@ impl TransactionRepository for PostgresTransactionRepo {
             r.status,
         )).collect())
     }
+
+    async fn sum_completed_for_momo(&self, momo_number: &str) -> Result<u64, DomainError> {
+        let row = sqlx::query!(
+            r#"
+            SELECT COALESCE(SUM(amount_sats), 0)::bigint as "total!: i64"
+            FROM transactions
+            WHERE momo_number = $1
+            AND status IN ('COMPLETED', 'PENDING')
+            AND transaction_type = 'SELL_BITCOIN'
+            "#,
+            momo_number
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DomainError::ExternalService(e.to_string()))?;
+
+        Ok(row.total as u64)
+    }
 }

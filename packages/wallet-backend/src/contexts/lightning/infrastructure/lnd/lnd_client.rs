@@ -26,7 +26,7 @@ impl LndClient {
     pub async fn subscribe_invoices(
         &mut self,
         mut callback: impl FnMut(tonic_lnd::lnrpc::Invoice),
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut lightning = self.client.lightning().clone();
 
         let response = lightning
@@ -56,7 +56,7 @@ impl LndClient {
         &mut self,
         amount_sats: i64,
         memo: &str,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let mut lightning = self.client.lightning().clone();
 
         let response = lightning
@@ -74,7 +74,7 @@ impl LndClient {
     pub async fn pay_invoice(
         &mut self,
         payment_request: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut lightning = self.client.lightning().clone();
 
         lightning
@@ -85,5 +85,31 @@ impl LndClient {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn list_settled_invoices_for_momo(
+        &mut self,
+        momo_number: &str,
+    ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        let mut lightning = self.client.lightning().clone();
+        let memo_prefix = format!("flash-wallet:{}", momo_number);
+
+        let response = lightning
+            .list_invoices(tonic_lnd::lnrpc::ListInvoiceRequest {
+                pending_only: false,
+                index_offset: 0,
+                num_max_invoices: 10000,
+                reversed: false,
+            })
+            .await?
+            .into_inner();
+
+        let total_sats: u64 = response.invoices
+            .iter()
+            .filter(|inv| inv.state == 1 && inv.memo.starts_with(&memo_prefix))
+            .map(|inv| inv.value as u64)
+            .sum();
+
+        Ok(total_sats)
     }
 }

@@ -87,7 +87,7 @@ impl FlashTransaction {
             },
             momo_number: MomoNumber::new(momo_number).unwrap(),
             payment_hash: None,
-            created_at: Utc::now(),
+            created_at: Utc::now(), // TODO: parse from DB
         }
     }
 
@@ -113,4 +113,10 @@ impl FlashTransaction {
     pub fn set_payment_hash(&mut self, hash: PaymentHash) { self.payment_hash = Some(hash); }
     pub fn is_pending(&self) -> bool { self.status == TransactionStatus::Pending }
     pub fn is_completed(&self) -> bool { self.status == TransactionStatus::Completed }
+    pub fn is_expired(&self) -> bool {
+        // PENDING depuis plus de 24h → expiré
+        self.status == TransactionStatus::Pending &&
+        (Utc::now() - self.created_at).num_hours() >= 24
+    }
+    pub fn mark_as_failed(&mut self) { self.status = TransactionStatus::Failed; }
 }

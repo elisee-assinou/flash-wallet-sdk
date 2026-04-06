@@ -25,6 +25,7 @@ use contexts::conversion::{
 };
 use contexts::wallet::infrastructure::repositories::postgres_balance_repo::PostgresBalanceRepo;
 use contexts::wallet::application::use_cases::get_balance::GetBalanceUseCase;
+use contexts::wallet::application::use_cases::convert_balance::ConvertBalanceUseCase;
 use contexts::wallet::{
     infrastructure::repositories::postgres_wallet_repo::PostgresWalletRepo,
     application::use_cases::{
@@ -94,6 +95,13 @@ async fn main() {
         &lnd_macaroon,
     ).await.expect("Failed to connect to LND listener");
     let lnd_listener_client = Arc::new(tokio::sync::Mutex::new(lnd_listener_client));
+    // Client LND pour les conversions de balance
+    let lnd_convert_client = LndClient::connect(
+        &lnd_host,
+        &lnd_tls_cert,
+        &lnd_macaroon,
+    ).await.expect("Failed to connect to LND convert");
+    let lnd_convert_client = Arc::new(tokio::sync::Mutex::new(lnd_convert_client));
     tracing::info!(" Connected to LND (carol)");
 
     // Conversion use cases
@@ -116,7 +124,13 @@ async fn main() {
     // Wallet use cases
     let configure_wallet_use_case = Arc::new(ConfigureWalletUseCase::new(wallet_repo.clone()));
     let get_wallet_use_case = Arc::new(GetWalletUseCase::new(wallet_repo.clone()));
-    let get_balance_use_case = Arc::new(GetBalanceUseCase::new(balance_repo.clone(), wallet_repo.clone()));
+    let get_balance_use_case = Arc::new(GetBalanceUseCase::new(wallet_repo.clone(), transaction_repo.clone(), lnd_convert_client.clone()));
+    let convert_balance_use_case = Arc::new(ConvertBalanceUseCase::new(
+        wallet_repo.clone(),
+        flash_gateway.clone(),
+        transaction_repo.clone(),
+        lnd_convert_client.clone(),
+    ));
 
     // Auto-convert listener — tourne en arrière-plan
     let listener = AutoConvertListener::new(
@@ -156,7 +170,7 @@ async fn main() {
             buy_bitcoin_use_case,
             list_transactions_use_case,
         ))
-        .merge(wallet_router(configure_wallet_use_case, get_wallet_use_case, get_balance_use_case))
+        .merge(wallet_router(configure_wallet_use_case, get_wallet_use_case, get_balance_use_case, convert_balance_use_case))
         .merge(lnurlp_router(LnurlpState {
             wallet_repo: wallet_repo.clone(),
             lnd_client: lnd_invoice_client.clone(),
@@ -168,5 +182,13 @@ async fn main() {
     let addr = format!("0.0.0.0:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     tracing::info!(" Flash Wallet Backend running on http://localhost:{}", port);
+    // Job expiration des transactions PENDING
+    let expire_repo = transaction_repo.clone();
+    tokio::spawn(async move {
+        use contexts::conversion::application::use_cases::expire_pending::ExpirePendingUseCase;
+        let expire_use_case = ExpirePendingUseCase::new(expire_repo);
+        expire_use_case.run_forever().await;
+    });
+
     axum::serve(listener, app).await.unwrap();
 }
