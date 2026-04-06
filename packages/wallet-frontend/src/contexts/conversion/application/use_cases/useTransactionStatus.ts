@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { TransactionStatusResult } from '../../domain/entities/Transaction';
 
 export const useTransactionStatus = (transactionId: string | null) => {

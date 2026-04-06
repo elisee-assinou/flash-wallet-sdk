@@ -4,7 +4,7 @@ import { WalletConfigForm } from './WalletConfigForm';
 import { WalletInfo } from './WalletInfo';
 
 export const WalletDashboard: React.FC = () => {
-  const { wallet, loading, configure } = useWallet();
+  const { wallet, loading, configuring, error, configure } = useWallet();
 
   if (loading) {
     return (
@@ -21,10 +21,21 @@ export const WalletDashboard: React.FC = () => {
         <p className="text-gray-400 mb-8">
           Configurez votre wallet pour commencer à recevoir des sats et les convertir en XOF sur MTN MoMo.
         </p>
-        <WalletConfigForm onConfigure={configure} />
+        <WalletConfigForm
+          onConfigure={configure}
+          error={error}
+          configuring={configuring}
+        />
       </div>
     );
   }
 
-  return <WalletInfo wallet={wallet} onReconfigure={configure} />;
+  return (
+    <WalletInfo
+      wallet={wallet}
+      onReconfigure={configure}
+      reconfigureError={error}
+      configuring={configuring}
+    />
+  );
 };

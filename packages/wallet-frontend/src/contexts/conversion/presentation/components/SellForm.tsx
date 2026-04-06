@@ -1,119 +1,148 @@
 import React, { useState } from 'react';
+import { Zap, Smartphone, Loader2, CheckCircle, Clock } from 'lucide-react';
 import { useAutoConvert } from '../../application/use_cases/useAutoConvert';
 import { useTransactionStatus } from '../../application/use_cases/useTransactionStatus';
+import { Balance } from '../../../wallet/domain/entities/Balance';
 import { WalletConfig } from '../../../wallet/domain/entities/WalletConfig';
 
 interface Props {
   wallet: WalletConfig;
+  balance: Balance | null;
 }
 
-export const SellForm: React.FC<Props> = ({ wallet }) => {
-  const [amountSats, setAmountSats] = useState('');
+export const SellForm: React.FC<Props> = ({ wallet, balance }) => {
   const { execute, loading, error, transaction } = useAutoConvert();
   const { status, connected } = useTransactionStatus(transaction?.id || null);
+  const [ratio, setRatio] = useState(100);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const availableSats = balance?.balanceSats ?? 0;
+  const satsToConvert = Math.floor(availableSats * ratio / 100);
+  const satsRemaining = availableSats - satsToConvert;
+
+  const handleConvert = async () => {
+    if (availableSats === 0 || satsToConvert === 0) return;
     await execute({
-      amountSats: parseInt(amountSats),
+      amountSats: satsToConvert,
       momoNumber: wallet.momoNumber,
-      convertRatio: wallet.convertRatio,
+      convertRatio: 1.0,
     });
   };
 
-  const copyInvoice = () => {
-    if (transaction?.invoice) {
-      navigator.clipboard.writeText(transaction.invoice);
-      alert('Invoice copied!');
-    }
-  };
-
   return (
-      <div className="bg-gray-900 rounded-2xl p-6 space-y-4">
-        <h3 className="font-bold text-lg">Vendre des sats → XOF sur MoMo</h3>
+    <div className="bg-gray-900 rounded-2xl p-6 space-y-5">
+      <h3 className="font-bold text-lg flex items-center gap-2">
+        <Zap size={20} className="text-yellow-400" />
+        Convertir mes sats en XOF
+      </h3>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Montant en satoshis</label>
-            <input
-                type="number"
-                value={amountSats}
-                onChange={(e) => setAmountSats(e.target.value)}
-                placeholder="239999"
-                className="w-full bg-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 outline-none focus:ring-2 focus:ring-yellow-400"
-                required
-            />
+      {/* Solde disponible */}
+      <div className="bg-gray-800 rounded-xl p-4">
+        <p className="text-gray-400 text-sm mb-1">Solde disponible</p>
+        <p className="text-yellow-400 font-bold text-2xl">
+          {availableSats.toLocaleString()} sats
+        </p>
+      </div>
+
+      {/* Slider */}
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <label className="text-sm text-gray-400">Montant à convertir</label>
+          <span className="text-yellow-400 font-bold">{ratio}%</span>
+        </div>
+        <input
+          type="range"
+          min="10"
+          max="100"
+          step="10"
+          value={ratio}
+          onChange={(e) => setRatio(parseInt(e.target.value))}
+          className="w-full accent-yellow-400"
+        />
+        <div className="flex justify-between text-xs text-gray-500">
+          <span>10%</span>
+          <span>50%</span>
+          <span>100%</span>
+        </div>
+
+        {/* Résumé */}
+        <div className="bg-gray-800 rounded-xl p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-400">Sats à convertir</span>
+            <span className="text-white font-bold">{satsToConvert.toLocaleString()} sats</span>
           </div>
-
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>MoMo destinataire</span>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-400">Sats restants</span>
+            <span className="text-gray-400">{satsRemaining.toLocaleString()} sats</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-400 flex items-center gap-1">
+              <Smartphone size={12} />
+              MoMo
+            </span>
             <span className="text-white">{wallet.momoNumber}</span>
           </div>
-
-          <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-yellow-400 text-gray-950 font-bold py-3 rounded-lg hover:bg-yellow-300 transition disabled:opacity-50"
-          >
-            {loading ? 'Conversion en cours...' : 'Convertir en XOF ⚡'}
-          </button>
-        </form>
-
-        {error && (
-            <div className="bg-red-900/30 border border-red-500 rounded-lg px-4 py-3 text-red-400 text-sm">
-              {error}
-            </div>
-        )}
-
-        {transaction && (
-            <div className="bg-gray-800 rounded-xl p-4 space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-400 text-sm">Montant XOF</span>
-                <span className="text-yellow-400 font-bold">{transaction.amountXof}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400 text-sm">Statut</span>
-                <span className={`text-sm font-bold ${
-                    status?.isCompleted ? 'text-green-400' : 'text-yellow-400'
-                }`}>
-              {status?.isCompleted ? ' COMPLETED' : ' ' + (status?.status || 'PENDING')}
-            </span>
-              </div>
-
-              {connected && (
-                  <div className="text-xs text-gray-500 text-center">
-                    🔴 Live
-                  </div>
-              )}
-
-              {/* Invoice Lightning */}
-              {transaction.invoice && !status?.isCompleted && (
-                  <div className="border border-yellow-400/30 rounded-lg p-3 space-y-2">
-                    <p className="text-xs text-yellow-400 font-bold">⚡ Payez cette invoice Lightning</p>
-                    <p className="text-xs text-gray-500">
-                      Copiez l'invoice dans votre wallet Lightning (Phoenix, Alby, Zeus...)
-                    </p>
-                    <div className="bg-gray-900 rounded p-2">
-                      <p className="text-xs text-gray-400 font-mono break-all">
-                        {transaction.invoice.slice(0, 40)}...
-                      </p>
-                    </div>
-                    <button
-                        onClick={copyInvoice}
-                        className="w-full bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 text-sm py-2 rounded-lg hover:bg-yellow-400/20 transition"
-                    >
-                       Copy the invoice
-                    </button>
-                  </div>
-              )}
-
-              {status?.isCompleted && (
-                  <div className="bg-green-900/30 border border-green-500 rounded-lg px-4 py-3 text-green-400 text-sm text-center font-bold">
-                    {transaction.amountXof} envoyés sur votre MoMo ✅
-                  </div>
-              )}
-            </div>
-        )}
+        </div>
       </div>
+
+      {/* Bouton */}
+      <button
+        onClick={handleConvert}
+        disabled={loading || availableSats === 0 || satsToConvert === 0}
+        className="w-full bg-yellow-400 text-gray-950 font-bold py-3 rounded-lg hover:bg-yellow-300 transition disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        {loading ? (
+          <>
+            <Loader2 size={18} className="animate-spin" />
+            Conversion en cours...
+          </>
+        ) : (
+          <>
+            <Zap size={18} />
+            Convertir {satsToConvert.toLocaleString()} sats en XOF
+          </>
+        )}
+      </button>
+
+      {error && (
+        <div className="bg-red-900/30 border border-red-500 rounded-lg px-4 py-3 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      {transaction && (
+        <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+          <div className="flex justify-between">
+            <span className="text-gray-400 text-sm">Montant XOF</span>
+            <span className="text-yellow-400 font-bold">{transaction.amountXof}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-400 text-sm">Statut</span>
+            {status?.isCompleted ? (
+              <span className="text-green-400 text-sm font-bold flex items-center gap-1">
+                <CheckCircle size={14} /> COMPLETED
+              </span>
+            ) : (
+              <span className="text-yellow-400 text-sm font-bold flex items-center gap-1">
+                <Clock size={14} /> PENDING
+              </span>
+            )}
+          </div>
+
+          {connected && (
+            <div className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block" />
+              Live
+            </div>
+          )}
+
+          {status?.isCompleted && (
+            <div className="bg-green-900/30 border border-green-500 rounded-lg px-4 py-3 text-green-400 text-sm text-center font-bold flex items-center justify-center gap-2">
+              <CheckCircle size={16} />
+              {transaction.amountXof} XOF envoyés sur votre MoMo
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };

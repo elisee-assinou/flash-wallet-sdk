@@ -1,18 +1,26 @@
 import React from 'react';
-import { useBalance } from '../../application/use_cases/useBalance';
+import { RefreshCw, Zap } from 'lucide-react';
+import { Balance } from '../../domain/entities/Balance';
 
-export const BalanceCard: React.FC = () => {
-  const { balance, loading, fetchBalance } = useBalance();
+interface Props {
+  balance: Balance | null;
+  loading: boolean;
+  onRefresh: () => void;
+}
 
+export const BalanceCard: React.FC<Props> = ({ balance, loading, onRefresh }) => {
   return (
     <div className="bg-gray-900 rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-lg"> Solde en sats</h3>
+        <h3 className="font-bold text-lg flex items-center gap-2">
+          <Zap size={18} className="text-yellow-400" />
+          Solde en sats
+        </h3>
         <button
-          onClick={fetchBalance}
-          className="text-xs text-gray-400 hover:text-yellow-400 transition"
+          onClick={onRefresh}
+          className="text-gray-400 hover:text-yellow-400 transition"
         >
-           Actualiser
+          <RefreshCw size={14} />
         </button>
       </div>
 
@@ -28,9 +36,7 @@ export const BalanceCard: React.FC = () => {
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-400 text-sm">Bitcoin</span>
-            <span className="text-white text-sm">
-              {balance.balanceBtc.toFixed(8)} BTC
-            </span>
+            <span className="text-white text-sm">{balance.balanceBtc.toFixed(8)} BTC</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-400 text-sm">MoMo</span>

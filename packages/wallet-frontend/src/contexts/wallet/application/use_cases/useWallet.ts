@@ -4,23 +4,23 @@ import { WalletConfig, ConfigureWalletInput } from '../../domain/entities/Wallet
 
 export const useWallet = () => {
   const [wallet, setWallet] = useState<WalletConfig | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [configuring, setConfiguring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchWallet = async () => {
-    setLoading(true);
     try {
       const result = await walletApi.get();
       setWallet(result);
     } catch {
       setWallet(null);
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   };
 
   const configure = async (input: ConfigureWalletInput) => {
-    setLoading(true);
+    setConfiguring(true);
     setError(null);
     try {
       const result = await walletApi.configure(input);
@@ -28,8 +28,9 @@ export const useWallet = () => {
       return result;
     } catch (e: any) {
       setError(e.response?.data || 'Erreur de configuration');
+      return null;
     } finally {
-      setLoading(false);
+      setConfiguring(false);
     }
   };
 
@@ -37,5 +38,12 @@ export const useWallet = () => {
     fetchWallet();
   }, []);
 
-  return { wallet, loading, error, configure, fetchWallet };
+  return {
+    wallet,
+    loading: initialLoading,  // seulement pour le chargement initial
+    configuring,              // pour le bouton "Configuration..."
+    error,
+    configure,
+    fetchWallet,
+  };
 };
