@@ -79,7 +79,7 @@ impl WalletConfigRepository for PostgresWalletRepo {
 
     async fn find_by_momo_number(&self, momo_number: &str) -> Result<Option<WalletConfig>, DomainError> {
         let row = sqlx::query!(
-            r#"SELECT * FROM wallet_config WHERE momo_number = $1 LIMIT 1"#,
+            r#"SELECT * FROM wallet_config WHERE momo_number = $1 ORDER BY created_at DESC LIMIT 1"#,
             momo_number
         )
         .fetch_optional(&self.pool)
@@ -92,7 +92,7 @@ impl WalletConfigRepository for PostgresWalletRepo {
     async fn find_by_username(&self, username: &str) -> Result<Option<WalletConfig>, DomainError> {
         let pattern = format!("{}@%", username);
         let row = sqlx::query!(
-            r#"SELECT * FROM wallet_config WHERE lightning_address LIKE $1 LIMIT 1"#,
+            r#"SELECT * FROM wallet_config WHERE lightning_address LIKE $1 ORDER BY created_at DESC LIMIT 1"#,
             pattern
         )
         .fetch_optional(&self.pool)

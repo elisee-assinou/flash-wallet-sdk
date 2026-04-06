@@ -23,6 +23,8 @@ use contexts::conversion::{
     },
     presentation::routes::transaction_routes::transaction_router,
 };
+use contexts::wallet::infrastructure::repositories::postgres_balance_repo::PostgresBalanceRepo;
+use contexts::wallet::application::use_cases::get_balance::GetBalanceUseCase;
 use contexts::wallet::{
     infrastructure::repositories::postgres_wallet_repo::PostgresWalletRepo,
     application::use_cases::{
@@ -73,6 +75,7 @@ async fn main() {
     let flash_gateway = Arc::new(FlashApiGateway::new(base_url, user_id, lightning_address));
     let transaction_repo = Arc::new(PostgresTransactionRepo::new(pool.clone()));
     let wallet_repo = Arc::new(PostgresWalletRepo::new(pool.clone()));
+    let balance_repo = Arc::new(PostgresBalanceRepo::new(pool.clone()));
 
     // LND Client
     // Client LND pour les invoices (LNURL-pay)
@@ -113,11 +116,13 @@ async fn main() {
     // Wallet use cases
     let configure_wallet_use_case = Arc::new(ConfigureWalletUseCase::new(wallet_repo.clone()));
     let get_wallet_use_case = Arc::new(GetWalletUseCase::new(wallet_repo.clone()));
+    let get_balance_use_case = Arc::new(GetBalanceUseCase::new(balance_repo.clone(), wallet_repo.clone()));
 
     // Auto-convert listener — tourne en arrière-plan
     let listener = AutoConvertListener::new(
         auto_convert_use_case.clone(),
         wallet_repo.clone(),
+        balance_repo.clone(),
         lnd_invoice_client.clone(),
     );
     let listener = Arc::new(listener);
@@ -151,7 +156,7 @@ async fn main() {
             buy_bitcoin_use_case,
             list_transactions_use_case,
         ))
-        .merge(wallet_router(configure_wallet_use_case, get_wallet_use_case))
+        .merge(wallet_router(configure_wallet_use_case, get_wallet_use_case, get_balance_use_case))
         .merge(lnurlp_router(LnurlpState {
             wallet_repo: wallet_repo.clone(),
             lnd_client: lnd_invoice_client.clone(),
