@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
-import { Zap, Smartphone, Loader2, CheckCircle, Clock } from 'lucide-react';
-import { useAutoConvert } from '../../application/use_cases/useAutoConvert';
-import { useTransactionStatus } from '../../application/use_cases/useTransactionStatus';
+import { Zap, Smartphone, Loader2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useConvertBalance } from '../../../wallet/application/use_cases/useConvertBalance';
 import { Balance } from '../../../wallet/domain/entities/Balance';
 import { WalletConfig } from '../../../wallet/domain/entities/WalletConfig';
 
 interface Props {
   wallet: WalletConfig;
   balance: Balance | null;
+  onConvertSuccess?: () => void;
 }
 
-export const SellForm: React.FC<Props> = ({ wallet, balance }) => {
-  const { execute, loading, error, transaction } = useAutoConvert();
-  const { status, connected } = useTransactionStatus(transaction?.id || null);
+export const SellForm: React.FC<Props> = ({ wallet, balance, onConvertSuccess }) => {
+  const { execute, loading, error, result } = useConvertBalance();
   const [ratio, setRatio] = useState(100);
 
   const availableSats = balance?.balanceSats ?? 0;
@@ -21,11 +20,10 @@ export const SellForm: React.FC<Props> = ({ wallet, balance }) => {
 
   const handleConvert = async () => {
     if (availableSats === 0 || satsToConvert === 0) return;
-    await execute({
-      amountSats: satsToConvert,
-      momoNumber: wallet.momoNumber,
-      convertRatio: 1.0,
-    });
+    const output = await execute(ratio / 100);
+    if (output && onConvertSuccess) {
+      onConvertSuccess(); // rafraîchit la balance
+    }
   };
 
   return (
@@ -35,7 +33,6 @@ export const SellForm: React.FC<Props> = ({ wallet, balance }) => {
         Convertir mes sats en XOF
       </h3>
 
-      {/* Solde disponible */}
       <div className="bg-gray-800 rounded-xl p-4">
         <p className="text-gray-400 text-sm mb-1">Solde disponible</p>
         <p className="text-yellow-400 font-bold text-2xl">
@@ -43,7 +40,6 @@ export const SellForm: React.FC<Props> = ({ wallet, balance }) => {
         </p>
       </div>
 
-      {/* Slider */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
           <label className="text-sm text-gray-400">Montant à convertir</label>
@@ -64,7 +60,6 @@ export const SellForm: React.FC<Props> = ({ wallet, balance }) => {
           <span>100%</span>
         </div>
 
-        {/* Résumé */}
         <div className="bg-gray-800 rounded-xl p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">Sats à convertir</span>
@@ -84,7 +79,6 @@ export const SellForm: React.FC<Props> = ({ wallet, balance }) => {
         </div>
       </div>
 
-      {/* Bouton */}
       <button
         onClick={handleConvert}
         disabled={loading || availableSats === 0 || satsToConvert === 0}
@@ -104,43 +98,32 @@ export const SellForm: React.FC<Props> = ({ wallet, balance }) => {
       </button>
 
       {error && (
-        <div className="bg-red-900/30 border border-red-500 rounded-lg px-4 py-3 text-red-400 text-sm">
-          {error}
+        <div className="bg-red-900/30 border border-red-500 rounded-lg px-4 py-3 text-red-400 text-sm flex items-start gap-2">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      {transaction && (
+      {result && (
         <div className="bg-gray-800 rounded-xl p-4 space-y-3">
           <div className="flex justify-between">
+            <span className="text-gray-400 text-sm">Sats convertis</span>
+            <span className="text-white font-bold">{result.satsConverted.toLocaleString()} sats</span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-gray-400 text-sm">Montant XOF</span>
-            <span className="text-yellow-400 font-bold">{transaction.amountXof}</span>
+            <span className="text-yellow-400 font-bold">{result.amountXof.toLocaleString()} XOF</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-400 text-sm">Statut</span>
-            {status?.isCompleted ? (
-              <span className="text-green-400 text-sm font-bold flex items-center gap-1">
-                <CheckCircle size={14} /> COMPLETED
-              </span>
-            ) : (
-              <span className="text-yellow-400 text-sm font-bold flex items-center gap-1">
-                <Clock size={14} /> PENDING
-              </span>
-            )}
+            <span className="text-yellow-400 text-sm font-bold flex items-center gap-1">
+              <Clock size={14} /> En attente Flash...
+            </span>
           </div>
-
-          {connected && (
-            <div className="text-xs text-gray-500 text-center flex items-center justify-center gap-1">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block" />
-              Live
-            </div>
-          )}
-
-          {status?.isCompleted && (
-            <div className="bg-green-900/30 border border-green-500 rounded-lg px-4 py-3 text-green-400 text-sm text-center font-bold flex items-center justify-center gap-2">
-              <CheckCircle size={16} />
-              {transaction.amountXof} XOF envoyés sur votre MoMo
-            </div>
-          )}
+          <div className="bg-green-900/30 border border-green-500 rounded-lg px-4 py-3 text-green-400 text-sm text-center font-bold flex items-center justify-center gap-2">
+            <CheckCircle size={16} />
+            Conversion initiée — XOF en route sur votre MoMo
+          </div>
         </div>
       )}
     </div>

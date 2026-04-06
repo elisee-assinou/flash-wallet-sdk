@@ -84,7 +84,7 @@ export const WalletInfo: React.FC<Props> = ({ wallet, onReconfigure, reconfigure
       )}
 
       <BalanceCard balance={balance} loading={loading} onRefresh={fetchBalance} />
-      <ConversionPanel wallet={wallet} balance={balance} />
+      <ConversionPanel wallet={wallet} balance={balance} onConvertSuccess={fetchBalance} />
     </div>
   );
 };

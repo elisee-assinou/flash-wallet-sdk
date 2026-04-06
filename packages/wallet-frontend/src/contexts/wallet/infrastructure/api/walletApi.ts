@@ -35,4 +35,16 @@ export const walletApi = {
     const { data } = await axios.get(`${BASE_URL}/wallet/balance`);
     return mapBalance(data);
   },
+
+  convertBalance: async (ratio: number): Promise<any> => {
+    const { data } = await axios.post(`${BASE_URL}/wallet/balance/convert`, {
+      ratio,
+    });
+    return {
+      satsConverted: data.sats_converted,
+      amountXof: data.amount_xof,
+      newBalanceSats: data.new_balance_sats,
+      message: data.message,
+    };
+  },
 };

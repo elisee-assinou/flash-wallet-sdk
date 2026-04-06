@@ -8,9 +8,10 @@ import { TransactionList } from './TransactionList';
 interface Props {
   wallet: WalletConfig;
   balance: Balance | null;
+  onConvertSuccess?: () => void;
 }
 
-export const ConversionPanel: React.FC<Props> = ({ wallet, balance }) => {
+export const ConversionPanel: React.FC<Props> = ({ wallet, balance, onConvertSuccess }) => {
   const [tab, setTab] = useState<'sell' | 'buy' | 'history'>('sell');
 
   return (
@@ -31,7 +32,13 @@ export const ConversionPanel: React.FC<Props> = ({ wallet, balance }) => {
         ))}
       </div>
 
-      {tab === 'sell' && <SellForm wallet={wallet} balance={balance} />}
+      {tab === 'sell' && (
+        <SellForm
+          wallet={wallet}
+          balance={balance}
+          onConvertSuccess={onConvertSuccess}
+        />
+      )}
       {tab === 'buy' && <BuyForm wallet={wallet} />}
       {tab === 'history' && <TransactionList />}
     </div>
