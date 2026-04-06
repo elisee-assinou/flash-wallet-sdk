@@ -1,0 +1,23 @@
+{
+  "name": "@flash-wallet/merchant-sdk",
+  "version": "1.0.0",
+  "description": "Flash Wallet Merchant SDK - Accept Bitcoin Lightning payments with automatic XOF conversion",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "bitcoin",
+    "lightning",
+    "xof",
+    "momo",
+    "flash",
+    "sdk"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
+}

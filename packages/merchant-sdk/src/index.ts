@@ -1,0 +1,262 @@
+/**
+ * Flash Wallet Merchant SDK
+ * Accept Bitcoin Lightning payments with automatic XOF conversion
+ */
+
+export interface FlashPaymentOptions {
+  backendUrl: string;
+  amountSats: number;
+  description: string;
+  onSuccess?: (invoice: string) => void;
+  onError?: (error: string) => void;
+}
+
+export interface FlashPaymentResponse {
+  invoice: string;
+  amountSats: number;
+  description: string;
+}
+
+const ICONS = {
+  zap: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  copy: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  check: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  x: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  loader: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flash-spin"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>`,
+  smartphone: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>`,
+};
+
+export async function createPayment(options: FlashPaymentOptions): Promise<FlashPaymentResponse> {
+  const response = await fetch(`${options.backendUrl}/api/v1/merchant/payment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      amount_sats: options.amountSats,
+      description: options.description,
+      lightning_address: options.lightningAddress,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error);
+  }
+
+  return response.json();
+}
+
+export function mountButton(selector: string, options: FlashPaymentOptions): void {
+  const container = document.querySelector(selector);
+  if (!container) {
+    console.error(`Flash SDK: Element ${selector} not found`);
+    return;
+  }
+
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes flash-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .flash-spin { animation: flash-spin 1s linear infinite; }
+
+    .flash-btn {
+      background: #FBBF24;
+      color: #111827;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s, transform 0.1s;
+      font-family: system-ui, sans-serif;
+    }
+    .flash-btn:hover { background: #F59E0B; transform: translateY(-1px); }
+    .flash-btn:active { transform: translateY(0); }
+    .flash-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .flash-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      backdrop-filter: blur(4px);
+    }
+    .flash-modal {
+      background: #1F2937;
+      border-radius: 20px;
+      padding: 28px;
+      max-width: 420px;
+      width: 92%;
+      color: white;
+      font-family: system-ui, sans-serif;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    }
+    .flash-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .flash-modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #FBBF24;
+      margin: 0;
+    }
+    .flash-close-btn {
+      background: #374151;
+      border: none;
+      color: #9CA3AF;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .flash-close-btn:hover { background: #4B5563; color: white; }
+    .flash-desc {
+      background: #111827;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .flash-desc-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    .flash-desc-label { color: #9CA3AF; display: flex; align-items: center; gap: 6px; }
+    .flash-desc-value { color: white; font-weight: 600; }
+    .flash-amount { color: #FBBF24; font-size: 22px; font-weight: 800; }
+    .flash-divider { border: none; border-top: 1px solid #374151; margin: 14px 0; }
+    .flash-label { font-size: 12px; color: #9CA3AF; margin-bottom: 6px; }
+    .flash-invoice-box {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 10px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 11px;
+      word-break: break-all;
+      color: #6B7280;
+      margin-bottom: 12px;
+      max-height: 80px;
+      overflow: hidden;
+    }
+    .flash-copy-btn {
+      width: 100%;
+      background: #374151;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.2s;
+      font-family: system-ui, sans-serif;
+    }
+    .flash-copy-btn:hover { background: #4B5563; }
+    .flash-copy-btn.copied { background: #065F46; color: #34D399; }
+    .flash-footer {
+      text-align: center;
+      font-size: 11px;
+      color: #6B7280;
+      margin-top: 16px;
+    }
+    .flash-footer a { color: #FBBF24; text-decoration: none; }
+  `;
+  document.head.appendChild(style);
+
+  const button = document.createElement('button');
+  button.className = 'flash-btn';
+  button.innerHTML = `${ICONS.zap} Payer avec Bitcoin`;
+  container.appendChild(button);
+
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    button.innerHTML = `${ICONS.loader} Génération...`;
+
+    try {
+      const payment = await createPayment(options);
+
+      const overlay = document.createElement('div');
+      overlay.className = 'flash-overlay';
+      overlay.innerHTML = `
+        <div class="flash-modal">
+          <div class="flash-modal-header">
+            <h3 class="flash-modal-title">${ICONS.zap} Payer avec Lightning</h3>
+            <button class="flash-close-btn" id="flash-close">${ICONS.x}</button>
+          </div>
+
+          <div class="flash-desc">
+            <div class="flash-desc-row">
+              <span class="flash-desc-label">${ICONS.smartphone} Description</span>
+              <span class="flash-desc-value">${payment.description}</span>
+            </div>
+            <hr class="flash-divider">
+            <div class="flash-desc-row">
+              <span class="flash-desc-label">${ICONS.zap} Montant</span>
+              <span class="flash-amount">${payment.amountSats.toLocaleString()} sats</span>
+            </div>
+          </div>
+
+          <p class="flash-label">Invoice Lightning à scanner ou copier :</p>
+          <div class="flash-invoice-box">${payment.invoice}</div>
+
+          <button class="flash-copy-btn" id="flash-copy">
+            ${ICONS.copy} Copier l'invoice
+          </button>
+
+          <div class="flash-footer">
+            Powered by <a href="https://bitcoinflash.xyz" target="_blank">Flash Wallet SDK</a>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      document.getElementById('flash-close')!.onclick = () => {
+        overlay.remove();
+        button.disabled = false;
+        button.innerHTML = `${ICONS.zap} Payer avec Bitcoin`;
+      };
+
+      const copyBtn = document.getElementById('flash-copy')!;
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(payment.invoice);
+        copyBtn.classList.add('copied');
+        copyBtn.innerHTML = `${ICONS.check} Invoice copiée !`;
+        options.onSuccess?.(payment.invoice);
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          copyBtn.innerHTML = `${ICONS.copy} Copier l'invoice`;
+        }, 3000);
+      };
+
+    } catch (e: any) {
+      options.onError?.(e.message);
+      button.disabled = false;
+      button.innerHTML = `${ICONS.zap} Payer avec Bitcoin`;
+    }
+  });
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).FlashSDK = { createPayment, mountButton };
+}
