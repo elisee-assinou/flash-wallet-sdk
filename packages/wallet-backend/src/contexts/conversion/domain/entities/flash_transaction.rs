@@ -24,6 +24,7 @@ pub enum TransactionStatus {
 pub struct FlashTransaction {
     id: EntityId,
     flash_transaction_id: Option<String>,
+    invoice: Option<String>,
     transaction_type: TransactionType,
     amount_xof: XofAmount,
     amount_sats: Satoshis,
@@ -44,7 +45,8 @@ impl FlashTransaction {
     ) -> Self {
         Self {
             id: EntityId::new(),
-            flash_transaction_id: None, // ← ajouté
+            flash_transaction_id: None,
+            invoice: None,
             transaction_type,
             amount_xof,
             amount_sats,
@@ -58,7 +60,8 @@ impl FlashTransaction {
 
     pub fn from_db(
         id: String,
-        flash_transaction_id: Option<String>, // ← ajouté
+        flash_transaction_id: Option<String>,
+        invoice: Option<String>,
         transaction_type: String,
         amount_xof: u64,
         amount_sats: u64,
@@ -68,7 +71,8 @@ impl FlashTransaction {
     ) -> Self {
         Self {
             id: EntityId::from_string(&id).unwrap(),
-            flash_transaction_id, // ← ajouté
+            flash_transaction_id,
+            invoice,
             transaction_type: match transaction_type.as_str() {
                 "BUY_BITCOIN" => TransactionType::BuyBitcoin,
                 _ => TransactionType::SellBitcoin,
@@ -90,6 +94,7 @@ impl FlashTransaction {
     // Getters
     pub fn id(&self) -> &EntityId { &self.id }
     pub fn flash_transaction_id(&self) -> Option<&str> { self.flash_transaction_id.as_deref() }
+    pub fn invoice(&self) -> Option<&str> { self.invoice.as_deref() }
     pub fn status(&self) -> &TransactionStatus { &self.status }
     pub fn transaction_type(&self) -> &TransactionType { &self.transaction_type }
     pub fn amount_xof(&self) -> &XofAmount { &self.amount_xof }
@@ -98,9 +103,9 @@ impl FlashTransaction {
     pub fn momo_number(&self) -> &MomoNumber { &self.momo_number }
     pub fn payment_hash(&self) -> Option<&PaymentHash> { self.payment_hash.as_ref() }
 
-    pub fn set_flash_transaction_id(&mut self, id: String) {
-        self.flash_transaction_id = Some(id);
-    }
+    // Setters
+    pub fn set_flash_transaction_id(&mut self, id: String) { self.flash_transaction_id = Some(id); }
+    pub fn set_invoice(&mut self, invoice: String) { self.invoice = Some(invoice); }
 
     // Business rules
     pub fn complete(&mut self) { self.status = TransactionStatus::Completed; }

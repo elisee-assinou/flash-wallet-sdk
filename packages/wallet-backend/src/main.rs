@@ -1,10 +1,14 @@
 mod contexts;
 mod shared;
 
+use rustls;
+
 use std::sync::Arc;
 use axum::Router;
+use axum::http::Method;
 use sqlx::postgres::PgPoolOptions;
 use tower_http::trace::TraceLayer;
+use tower_http::cors::{CorsLayer, Any};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use contexts::conversion::{
     infrastructure::{
@@ -27,9 +31,18 @@ use contexts::wallet::{
     },
     presentation::routes::wallet_routes::wallet_router,
 };
+use contexts::lightning::infrastructure::lnd::LndClient;
+use contexts::lightning::application::use_cases::auto_convert_listener::AutoConvertListener;
+
+fn install_crypto() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install ring crypto provider");
+}
 
 #[tokio::main]
 async fn main() {
+    install_crypto();
     dotenvy::dotenv().ok();
 
     tracing_subscriber::registry()
@@ -41,6 +54,9 @@ async fn main() {
     let lightning_address = std::env::var("FLASH_LIGHTNING_ADDRESS").expect("FLASH_LIGHTNING_ADDRESS must be set");
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let port = std::env::var("SERVER_PORT").unwrap_or_else(|_| "8080".to_string());
+    let lnd_host = std::env::var("LND_HOST").expect("LND_HOST must be set");
+    let lnd_tls_cert = std::env::var("LND_TLS_CERT").expect("LND_TLS_CERT must be set");
+    let lnd_macaroon = std::env::var("LND_MACAROON").expect("LND_MACAROON must be set");
 
     // Database
     let pool = PgPoolOptions::new()
@@ -56,6 +72,16 @@ async fn main() {
     let transaction_repo = Arc::new(PostgresTransactionRepo::new(pool.clone()));
     let wallet_repo = Arc::new(PostgresWalletRepo::new(pool.clone()));
 
+    // LND Client
+    let lnd_client = LndClient::connect(
+        &lnd_host,
+        &lnd_tls_cert,
+        &lnd_macaroon,
+    ).await.expect("Failed to connect to LND");
+
+    let lnd_client = Arc::new(tokio::sync::Mutex::new(lnd_client));
+    tracing::info!(" Connected to LND (carol)");
+
     // Conversion use cases
     let auto_convert_use_case = Arc::new(AutoConvertUseCase::new(
         transaction_repo.clone(),
@@ -64,7 +90,6 @@ async fn main() {
     let get_status_use_case = Arc::new(GetTransactionStatusUseCase::new(
         flash_gateway.clone(),
         transaction_repo.clone(),
-        
     ));
     let buy_bitcoin_use_case = Arc::new(BuyBitcoinUseCase::new(
         transaction_repo.clone(),
@@ -76,7 +101,37 @@ async fn main() {
 
     // Wallet use cases
     let configure_wallet_use_case = Arc::new(ConfigureWalletUseCase::new(wallet_repo.clone()));
-    let get_wallet_use_case = Arc::new(GetWalletUseCase::new(wallet_repo));
+    let get_wallet_use_case = Arc::new(GetWalletUseCase::new(wallet_repo.clone()));
+
+    // Auto-convert listener — tourne en arrière-plan
+    let listener = AutoConvertListener::new(
+        auto_convert_use_case.clone(),
+        wallet_repo.clone(),
+        lnd_client.clone(),
+    );
+    let listener = Arc::new(listener);
+    let lnd_for_listener = lnd_client.clone();
+
+    tokio::spawn(async move {
+        tracing::info!(" Starting invoice listener...");
+        let mut client = lnd_for_listener.lock().await;
+        if let Err(e) = client.subscribe_invoices(|invoice| {
+            let listener = listener.clone();
+            let amount_sats = invoice.value as u64;
+            let memo = invoice.memo.clone();
+            tokio::spawn(async move {
+                listener.on_invoice_settled(amount_sats, &memo).await;
+            });
+        }).await {
+            tracing::error!("Invoice listener error: {}", e);
+        }
+    });
+
+    // CORS
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(Any);
 
     let app = Router::new()
         .merge(transaction_router(
@@ -86,6 +141,7 @@ async fn main() {
             list_transactions_use_case,
         ))
         .merge(wallet_router(configure_wallet_use_case, get_wallet_use_case))
+        .layer(cors)
         .layer(TraceLayer::new_for_http());
 
     let addr = format!("0.0.0.0:{}", port);

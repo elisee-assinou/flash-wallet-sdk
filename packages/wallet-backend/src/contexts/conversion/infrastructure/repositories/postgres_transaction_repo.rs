@@ -37,15 +37,17 @@ impl TransactionRepository for PostgresTransactionRepo {
         sqlx::query!(
             r#"
             INSERT INTO transactions 
-                (id, flash_transaction_id, transaction_type, amount_xof, amount_sats, exchange_rate, momo_number, status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                (id, flash_transaction_id, invoice, transaction_type, amount_xof, amount_sats, exchange_rate, momo_number, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (id) DO UPDATE SET
                 status = EXCLUDED.status,
                 flash_transaction_id = EXCLUDED.flash_transaction_id,
+                invoice = EXCLUDED.invoice,
                 updated_at = NOW()
             "#,
             id,
             transaction.flash_transaction_id(),
+            transaction.invoice(),
             transaction_type,
             transaction.amount_xof().amount() as i64,
             transaction.amount_sats().amount() as i64,
@@ -75,6 +77,7 @@ impl TransactionRepository for PostgresTransactionRepo {
         Ok(row.map(|r| FlashTransaction::from_db(
             r.id.to_string(),
             r.flash_transaction_id,
+            r.invoice,
             r.transaction_type,
             r.amount_xof as u64,
             r.amount_sats as u64,
@@ -95,6 +98,7 @@ impl TransactionRepository for PostgresTransactionRepo {
         Ok(rows.into_iter().map(|r| FlashTransaction::from_db(
             r.id.to_string(),
             r.flash_transaction_id,
+            r.invoice,
             r.transaction_type,
             r.amount_xof as u64,
             r.amount_sats as u64,
@@ -115,6 +119,7 @@ impl TransactionRepository for PostgresTransactionRepo {
         Ok(rows.into_iter().map(|r| FlashTransaction::from_db(
             r.id.to_string(),
             r.flash_transaction_id,
+            r.invoice,
             r.transaction_type,
             r.amount_xof as u64,
             r.amount_sats as u64,

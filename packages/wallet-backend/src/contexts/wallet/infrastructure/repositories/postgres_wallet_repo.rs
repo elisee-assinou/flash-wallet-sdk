@@ -16,6 +16,11 @@ impl PostgresWalletRepo {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+
+    fn map_row(lightning_address: String, momo_number: String, convert_ratio: f64) -> WalletConfig {
+        let momo = MomoNumber::new(momo_number).unwrap();
+        WalletConfig::new(lightning_address, momo, convert_ratio)
+    }
 }
 
 #[async_trait]
@@ -56,9 +61,31 @@ impl WalletConfigRepository for PostgresWalletRepo {
         .await
         .map_err(|e| DomainError::ExternalService(e.to_string()))?;
 
-        Ok(row.map(|r| {
-            let momo = MomoNumber::new(r.momo_number).unwrap();
-            WalletConfig::new(r.lightning_address, momo, r.convert_ratio)
-        }))
+        Ok(row.map(|r| Self::map_row(r.lightning_address, r.momo_number, r.convert_ratio)))
+    }
+
+    async fn find_all(&self) -> Result<Vec<WalletConfig>, DomainError> {
+        let rows = sqlx::query!(
+            r#"SELECT * FROM wallet_config ORDER BY created_at DESC"#
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::ExternalService(e.to_string()))?;
+
+        Ok(rows.into_iter()
+            .map(|r| Self::map_row(r.lightning_address, r.momo_number, r.convert_ratio))
+            .collect())
+    }
+
+    async fn find_by_momo_number(&self, momo_number: &str) -> Result<Option<WalletConfig>, DomainError> {
+        let row = sqlx::query!(
+            r#"SELECT * FROM wallet_config WHERE momo_number = $1 LIMIT 1"#,
+            momo_number
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::ExternalService(e.to_string()))?;
+
+        Ok(row.map(|r| Self::map_row(r.lightning_address, r.momo_number, r.convert_ratio)))
     }
 }

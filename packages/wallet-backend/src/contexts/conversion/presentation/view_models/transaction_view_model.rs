@@ -8,6 +8,7 @@ pub struct TransactionViewModel {
     pub amount_xof: String,
     pub status: String,
     pub message: String,
+    pub invoice: Option<String>,
 }
 
 impl From<AutoConvertOutput> for TransactionViewModel {
@@ -18,6 +19,7 @@ impl From<AutoConvertOutput> for TransactionViewModel {
             amount_xof: format!("{} XOF", output.amount_xof),
             status: output.status,
             message: "Conversion initiated successfully".to_string(),
+            invoice: output.invoice,
         }
     }
 }

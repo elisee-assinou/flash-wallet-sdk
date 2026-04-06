@@ -1,3 +1,4 @@
 pub mod conversion;
-pub mod payment;
 pub mod wallet;
+pub mod merchant;
+pub mod lightning;

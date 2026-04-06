@@ -25,6 +25,7 @@ struct CreateTransactionBody {
 struct CreateTransactionResponse {
     success: bool,
     transaction: TransactionData,
+    invoice: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -120,7 +121,13 @@ impl FlashGateway for FlashApiGateway {
             data.transaction.exchange_rate,
             momo_number.clone(),
         );
+
         transaction.set_flash_transaction_id(data.transaction.id.clone());
+
+        // Stocke l'invoice Lightning
+        if let Some(invoice) = data.invoice {
+            transaction.set_invoice(invoice);
+        }
 
         Ok(transaction)
     }

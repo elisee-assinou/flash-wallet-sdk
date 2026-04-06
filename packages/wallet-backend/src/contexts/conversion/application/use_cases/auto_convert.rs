@@ -59,6 +59,7 @@ impl AutoConvertUseCase {
             amount_sats: sats_to_convert.amount(),
             amount_xof: transaction.amount_xof().amount(),
             status: "PENDING".to_string(),
+            invoice: transaction.invoice().map(|s| s.to_string()),
         })
     }
 }
