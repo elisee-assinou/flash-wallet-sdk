@@ -12,6 +12,7 @@ use crate::contexts::lightning::infrastructure::lnd::LndClient;
 
 pub struct ConvertBalanceInput {
     pub ratio: f64,
+    pub lightning_address: Option<String>,
 }
 
 pub struct ConvertBalanceOutput {
@@ -39,8 +40,15 @@ impl ConvertBalanceUseCase {
     }
 
     pub async fn execute(&self, input: ConvertBalanceInput) -> Result<ConvertBalanceOutput, DomainError> {
-        let wallet = self.wallet_repo.find().await?
-            .ok_or_else(|| DomainError::NotFound("Wallet not configured".to_string()))?;
+        let wallet = match input.lightning_address.as_deref() {
+            Some(address) => {
+                let all = self.wallet_repo.find_all().await?;
+                all.into_iter().find(|w| w.lightning_address() == address)
+                    .ok_or_else(|| DomainError::NotFound(format!("Wallet not found for {}", address)))?
+            }
+            None => self.wallet_repo.find().await?
+                .ok_or_else(|| DomainError::NotFound("Wallet not configured".to_string()))?,
+        };
 
         let momo = wallet.momo_number().value().to_string();
 
@@ -65,7 +73,7 @@ impl ConvertBalanceUseCase {
         }
 
         tracing::info!(
-            "💱 Convert balance: {} sats ({}%) → XOF for {}",
+            "Convert balance: {} sats ({}%) → XOF for {}",
             sats_to_convert,
             (input.ratio * 100.0) as u32,
             momo
@@ -84,16 +92,16 @@ impl ConvertBalanceUseCase {
         self.transaction_repo.save(&transaction).await?;
 
         if let Some(invoice) = transaction.invoice() {
-            tracing::info!("⚡ Paying Flash invoice...");
+            tracing::info!(" Paying Flash invoice...");
             let mut lnd = self.lnd_client.lock().await;
             match lnd.pay_invoice(invoice).await {
                 Ok(_) => {
-                    tracing::info!("✅ Flash invoice paid → XOF en route to MoMo");
+                    tracing::info!(" Flash invoice paid → XOF en route to MoMo");
                     transaction.complete();
                     self.transaction_repo.save(&transaction).await?;
 
                     let new_balance = available_sats as i64 - sats_to_convert as i64;
-                    tracing::info!("✅ New balance: {} sats", new_balance);
+                    tracing::info!(" New balance: {} sats", new_balance);
 
                     return Ok(ConvertBalanceOutput {
                         sats_converted: sats_to_convert,
@@ -103,7 +111,7 @@ impl ConvertBalanceUseCase {
                 }
                 Err(e) => {
                     let err_msg = e.to_string();
-                    tracing::error!("❌ Failed to pay Flash invoice: {}", err_msg);
+                    tracing::error!(" Failed to pay Flash invoice: {}", err_msg);
                     transaction.fail();
                     self.transaction_repo.save(&transaction).await?;
                     return Err(DomainError::ExternalService(

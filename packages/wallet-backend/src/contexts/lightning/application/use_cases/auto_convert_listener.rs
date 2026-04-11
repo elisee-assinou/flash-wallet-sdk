@@ -98,7 +98,7 @@ impl AutoConvertListener {
                     );
 
                     if let Some(flash_invoice) = output.invoice {
-                        tracing::info!("⚡ Paying Flash invoice...");
+                        tracing::info!("Paying Flash invoice...");
                         let mut lnd = self.lnd_client.lock().await;
                         match lnd.pay_invoice(&flash_invoice).await {
                             Ok(_) => tracing::info!(" Flash invoice paid --> XOF en route to MoMo"),

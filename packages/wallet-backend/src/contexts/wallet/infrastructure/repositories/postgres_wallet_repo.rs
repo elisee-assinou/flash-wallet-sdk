@@ -34,9 +34,7 @@ impl WalletConfigRepository for PostgresWalletRepo {
             INSERT INTO wallet_config
                 (id, lightning_address, momo_number, convert_ratio, is_auto_convert)
             VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (id) DO UPDATE SET
-                lightning_address = EXCLUDED.lightning_address,
-                momo_number = EXCLUDED.momo_number,
+            ON CONFLICT (momo_number, lightning_address) DO UPDATE SET
                 convert_ratio = EXCLUDED.convert_ratio,
                 updated_at = NOW()
             "#,

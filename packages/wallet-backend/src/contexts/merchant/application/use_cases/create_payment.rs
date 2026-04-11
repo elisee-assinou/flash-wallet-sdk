@@ -57,7 +57,7 @@ impl CreatePaymentUseCase {
             .map_err(|e| DomainError::ExternalService(e.to_string()))?;
 
         tracing::info!(
-            "💳 Merchant payment: {} sats — {} for {} ({})",
+            " Merchant payment: {} sats — {} for {} ({})",
             input.amount_sats,
             input.description,
             input.lightning_address,

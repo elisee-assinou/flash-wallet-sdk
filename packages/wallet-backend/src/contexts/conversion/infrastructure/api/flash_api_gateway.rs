@@ -12,6 +12,8 @@ use crate::contexts::conversion::domain::{
     ports::flash_gateway::FlashGateway,
 };
 
+// --- DTO de Requête ---
+
 #[derive(Serialize)]
 struct CreateTransactionBody {
     amount: u64,
@@ -21,33 +23,38 @@ struct CreateTransactionBody {
     number: String,
 }
 
-#[derive(Deserialize)]
-struct CreateTransactionResponse {
-    success: bool,
-    transaction: TransactionData,
-    invoice: Option<String>,
+// --- DTO de Réponse ---
+// Serde ignore les champs inconnus par défaut, donc pas besoin d'attribut supplémentaire.
+
+#[derive(Deserialize, Debug)]
+pub struct CreateTransactionResponse {
+    pub success: bool,
+    pub transaction: TransactionData,
+    pub invoice: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct TransactionData {
-    id: String,
-    amount: u64,
-    amount_sats: String,
-    exchange_rate: u64,
-    status: String,
-    payment_url: Option<String>,
+#[derive(Deserialize, Debug)]
+pub struct TransactionData {
+    pub id: String,
+    pub amount: f64,
+    pub amount_sats: String,
+    pub exchange_rate: u64,
+    pub status: String,
+    pub payment_url: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct GetTransactionResponse {
-    success: bool,
-    transaction: Option<GetTransactionData>,
+#[derive(Deserialize, Debug)]
+pub struct GetTransactionResponse {
+    pub success: bool,
+    pub transaction: Option<GetTransactionData>,
 }
 
-#[derive(Deserialize)]
-struct GetTransactionData {
-    status: String,
+#[derive(Deserialize, Debug)]
+pub struct GetTransactionData {
+    pub status: String,
 }
+
+// --- Implémentation du Gateway ---
 
 pub struct FlashApiGateway {
     client: Client,
@@ -66,6 +73,7 @@ impl FlashApiGateway {
         }
     }
 
+    /// Extrait le nombre depuis une chaîne comme "13706 SATS"
     fn parse_sats(amount_sats: &str) -> u64 {
         amount_sats
             .split_whitespace()
@@ -89,7 +97,7 @@ impl FlashGateway for FlashApiGateway {
             amount: amount_xof.amount(),
             receiver_address: self.lightning_address.clone(),
             transaction_type: "SELL_BITCOIN".to_string(),
-            number: momo_number.value().to_string(),
+            number: momo_number.value().trim_start_matches('+').to_string(),
         };
 
         let response = self.client
@@ -99,12 +107,18 @@ impl FlashGateway for FlashApiGateway {
             .json(&body)
             .send()
             .await
-            .map_err(|e| DomainError::ExternalService(e.to_string()))?;
+            .map_err(|e| DomainError::ExternalService(format!("Request failed: {}", e)))?;
 
-        let data: CreateTransactionResponse = response
-            .json()
-            .await
-            .map_err(|e| DomainError::ExternalService(e.to_string()))?;
+        // Lecture du texte pour le debug
+        let text = response.text().await
+            .map_err(|e| DomainError::ExternalService(format!("Failed to read body: {}", e)))?;
+
+        tracing::info!("Flash SELL response: {}", text);
+
+        let data: CreateTransactionResponse = serde_json::from_str(&text)
+            .map_err(|e| DomainError::ExternalService(
+                format!("JSON Decode Error: {} | Raw Body: {}", e, text)
+            ))?;
 
         if !data.success {
             return Err(DomainError::ExternalService(
@@ -122,9 +136,8 @@ impl FlashGateway for FlashApiGateway {
             momo_number.clone(),
         );
 
-        transaction.set_flash_transaction_id(data.transaction.id.clone());
+        transaction.set_flash_transaction_id(data.transaction.id);
 
-        // Stocke l'invoice Lightning
         if let Some(invoice) = data.invoice {
             transaction.set_invoice(invoice);
         }
@@ -144,7 +157,7 @@ impl FlashGateway for FlashApiGateway {
             "amount": amount_xof.amount(),
             "receiver_address": lightning_address,
             "type": "BUY_BITCOIN",
-            "number": momo_number.value()
+            "number": momo_number.value().trim_start_matches('+')
         });
 
         let response = self.client
@@ -159,17 +172,13 @@ impl FlashGateway for FlashApiGateway {
         let text = response.text().await
             .map_err(|e| DomainError::ExternalService(e.to_string()))?;
 
-        tracing::info!("Flash BUY response: {}", text);
-
         let data: CreateTransactionResponse = serde_json::from_str(&text)
             .map_err(|e| DomainError::ExternalService(
                 format!("Parse error: {} - Body: {}", e, text)
             ))?;
 
         if !data.success {
-            return Err(DomainError::ExternalService(
-                "Flash API returned success: false".to_string()
-            ));
+            return Err(DomainError::ExternalService("Flash API returned success: false".to_string()));
         }
 
         let sats_value = Self::parse_sats(&data.transaction.amount_sats);
@@ -182,7 +191,7 @@ impl FlashGateway for FlashApiGateway {
             data.transaction.exchange_rate,
             momo_number.clone(),
         );
-        transaction.set_flash_transaction_id(data.transaction.id.clone());
+        transaction.set_flash_transaction_id(data.transaction.id);
 
         Ok((transaction, payment_url))
     }
@@ -201,10 +210,13 @@ impl FlashGateway for FlashApiGateway {
             .await
             .map_err(|e| DomainError::ExternalService(e.to_string()))?;
 
-        let data: GetTransactionResponse = response
-            .json()
-            .await
+        let text = response.text().await
             .map_err(|e| DomainError::ExternalService(e.to_string()))?;
+
+        let data: GetTransactionResponse = serde_json::from_str(&text)
+            .map_err(|e| DomainError::ExternalService(
+                format!("Parse error: {} - Body: {}", e, text)
+            ))?;
 
         let transaction = data.transaction
             .ok_or_else(|| DomainError::NotFound("Transaction not found on Flash".to_string()))?;

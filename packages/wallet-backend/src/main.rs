@@ -9,7 +9,8 @@ use axum::http::Method;
 use sqlx::postgres::PgPoolOptions;
 use tower_http::trace::TraceLayer;
 use tower_http::cors::{CorsLayer, Any};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
 use contexts::conversion::{
     infrastructure::{
         api::flash_api_gateway::FlashApiGateway,
@@ -54,6 +55,9 @@ async fn main() {
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+            "warn,wallet_backend=info,sqlx=info".into()
+        }))
         .init();
 
     let base_url = std::env::var("FLASH_BASE_URL").expect("FLASH_BASE_URL must be set");

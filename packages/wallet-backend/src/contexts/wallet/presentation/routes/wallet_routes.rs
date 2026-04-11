@@ -19,6 +19,7 @@ use crate::contexts::wallet::{
 #[derive(Deserialize)]
 struct ConvertBalanceRequest {
     ratio: f64,
+    lightning_address: Option<String>,
 }
 
 pub fn wallet_router(
@@ -41,7 +42,7 @@ pub fn wallet_router(
             post(move |Json(body): Json<ConvertBalanceRequest>| {
                 let uc = uc.clone();
                 async move {
-                    match uc.execute(ConvertBalanceInput { ratio: body.ratio }).await {
+                    match uc.execute(ConvertBalanceInput { ratio: body.ratio, lightning_address: body.lightning_address.clone() }).await {
                         Ok(o) => (StatusCode::OK, Json(serde_json::json!({
                             "sats_converted": o.sats_converted,
                             "amount_xof": o.amount_xof,

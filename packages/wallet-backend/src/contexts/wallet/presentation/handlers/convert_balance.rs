@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use std::sync::Arc;
 use serde::Deserialize;
 use crate::contexts::wallet::application::use_cases::convert_balance::{
     ConvertBalanceUseCase, ConvertBalanceInput
@@ -8,13 +8,17 @@ use crate::contexts::wallet::application::use_cases::convert_balance::{
 #[derive(Deserialize)]
 pub struct ConvertBalanceRequest {
     pub ratio: f64,
+    pub lightning_address: Option<String>,
 }
 
 pub async fn convert_balance_handler(
     State(use_case): State<Arc<ConvertBalanceUseCase>>,
     Json(body): Json<ConvertBalanceRequest>,
 ) -> impl IntoResponse {
-    let input = ConvertBalanceInput { ratio: body.ratio };
+    let input = ConvertBalanceInput {
+        ratio: body.ratio,
+        lightning_address: body.lightning_address,
+    };
 
     match use_case.execute(input).await {
         Ok(output) => (
@@ -26,9 +30,6 @@ pub async fn convert_balance_handler(
                 "message": "Conversion successful"
             }))
         ).into_response(),
-        Err(e) => (
-            StatusCode::BAD_REQUEST,
-            e.to_string()
-        ).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
     }
 }
