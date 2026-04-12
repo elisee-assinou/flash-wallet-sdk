@@ -8,6 +8,7 @@ pub struct WalletConfig {
     momo_number: MomoNumber,
     convert_ratio: f64,
     is_auto_convert: bool,
+    webhook_url: Option<String>,
 }
 
 impl WalletConfig {
@@ -22,7 +23,13 @@ impl WalletConfig {
             momo_number,
             convert_ratio,
             is_auto_convert: true,
+            webhook_url: None,
         }
+    }
+
+    pub fn with_webhook(mut self, webhook_url: Option<String>) -> Self {
+        self.webhook_url = webhook_url;
+        self
     }
 
     pub fn id(&self) -> &EntityId { &self.id }
@@ -30,4 +37,5 @@ impl WalletConfig {
     pub fn momo_number(&self) -> &MomoNumber { &self.momo_number }
     pub fn convert_ratio(&self) -> f64 { self.convert_ratio }
     pub fn is_auto_convert(&self) -> bool { self.is_auto_convert }
+    pub fn webhook_url(&self) -> Option<&str> { self.webhook_url.as_deref() }
 }

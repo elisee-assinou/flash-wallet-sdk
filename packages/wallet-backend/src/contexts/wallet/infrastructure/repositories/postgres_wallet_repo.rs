@@ -21,6 +21,12 @@ impl PostgresWalletRepo {
         let momo = MomoNumber::new(momo_number).unwrap();
         WalletConfig::new(lightning_address, momo, convert_ratio)
     }
+
+    fn map_row_with_webhook(lightning_address: String, momo_number: String, convert_ratio: f64, webhook_url: Option<String>) -> WalletConfig {
+        let momo = MomoNumber::new(momo_number).unwrap();
+        WalletConfig::new(lightning_address, momo, convert_ratio)
+            .with_webhook(webhook_url)
+    }
 }
 
 #[async_trait]
@@ -84,7 +90,7 @@ impl WalletConfigRepository for PostgresWalletRepo {
         .await
         .map_err(|e| DomainError::ExternalService(e.to_string()))?;
 
-        Ok(row.map(|r| Self::map_row(r.lightning_address, r.momo_number, r.convert_ratio)))
+        Ok(row.map(|r| Self::map_row_with_webhook(r.lightning_address, r.momo_number, r.convert_ratio, r.webhook_url)))
     }
 
     async fn find_by_username(&self, username: &str) -> Result<Option<WalletConfig>, DomainError> {
@@ -98,5 +104,23 @@ impl WalletConfigRepository for PostgresWalletRepo {
         .map_err(|e| DomainError::ExternalService(e.to_string()))?;
 
         Ok(row.map(|r| Self::map_row(r.lightning_address, r.momo_number, r.convert_ratio)))
+    }
+}
+
+impl PostgresWalletRepo {
+    pub async fn update_webhook(
+        &self,
+        lightning_address: &str,
+        webhook_url: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "UPDATE wallet_config SET webhook_url = $1, updated_at = NOW()
+             WHERE lightning_address = $2",
+            webhook_url,
+            lightning_address,
+        )
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 }

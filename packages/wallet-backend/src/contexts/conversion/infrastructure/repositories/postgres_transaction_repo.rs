@@ -147,3 +147,36 @@ impl TransactionRepository for PostgresTransactionRepo {
         Ok(row.total as u64)
     }
 }
+
+impl PostgresTransactionRepo {
+    pub async fn find_pending_for_momo(&self, momo_number: &str) -> Result<Vec<FlashTransaction>, DomainError> {
+        let rows = sqlx::query!(
+            r#"SELECT * FROM transactions WHERE momo_number = $1 AND status = 'PENDING' ORDER BY created_at DESC"#,
+            momo_number
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::ExternalService(e.to_string()))?;
+
+        let mut transactions = Vec::new();
+        for r in rows {
+            let tx_type = match r.transaction_type.as_str() {
+                "SELL_BITCOIN" => "SELL_BITCOIN".to_string(),
+                _ => "BUY_BITCOIN".to_string(),
+            };
+            let tx = crate::contexts::conversion::domain::entities::flash_transaction::FlashTransaction::from_db(
+                r.id.to_string(),
+                r.flash_transaction_id,
+                r.invoice,
+                tx_type,
+                r.amount_xof as u64,
+                r.amount_sats as u64,
+                r.exchange_rate.try_into().unwrap_or(0),
+                r.momo_number,
+                r.status,
+            );
+            transactions.push(tx);
+        }
+        Ok(transactions)
+    }
+}

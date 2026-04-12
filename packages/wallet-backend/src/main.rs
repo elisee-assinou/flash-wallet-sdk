@@ -38,6 +38,7 @@ use contexts::wallet::{
 use contexts::lightning::infrastructure::lnd::LndClient;
 use contexts::lightning::presentation::routes::lnurlp_routes::lnurlp_router;
 use contexts::merchant::application::use_cases::create_payment::CreatePaymentUseCase;
+use contexts::merchant::application::use_cases::configure_webhook::ConfigureWebhookUseCase;
 use contexts::merchant::presentation::routes::merchant_routes::merchant_router;
 use contexts::lightning::presentation::handlers::lnurlp_handler::LnurlpState;
 use contexts::lightning::application::use_cases::auto_convert_listener::AutoConvertListener;
@@ -138,6 +139,8 @@ async fn main() {
         lnd_convert_client.clone(),
     ));
 
+    let configure_webhook_use_case = Arc::new(ConfigureWebhookUseCase::new(wallet_repo.clone()));
+
     let create_payment_use_case = Arc::new(CreatePaymentUseCase::new(
         wallet_repo.clone(),
         lnd_invoice_client.clone(),
@@ -149,6 +152,7 @@ async fn main() {
         wallet_repo.clone(),
         balance_repo.clone(),
         lnd_invoice_client.clone(),
+        transaction_repo.clone(),
     );
     let listener = Arc::new(listener);
     let lnd_for_listener = lnd_listener_client.clone();
@@ -182,7 +186,7 @@ async fn main() {
             list_transactions_use_case,
         ))
         .merge(wallet_router(configure_wallet_use_case, get_wallet_use_case, get_balance_use_case, convert_balance_use_case))
-        .merge(merchant_router(create_payment_use_case))
+        .merge(merchant_router(create_payment_use_case, configure_webhook_use_case))
         .merge(lnurlp_router(LnurlpState {
             wallet_repo: wallet_repo.clone(),
             lnd_client: lnd_invoice_client.clone(),
