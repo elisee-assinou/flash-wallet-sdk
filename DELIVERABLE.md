@@ -15,15 +15,11 @@
 
 ---
 
-## 📹 Demo Video
+##  Demo Video
 
-> ⏳ Coming soon — will be added before final submission
+[Demo Video](https://youtu.be/fPcAqx2Muwc)
 
 ---
-
-## 🌐 Live Demo
-
-> ⏳ Coming soon — ngrok or VPS deployment
 
 ---
 
