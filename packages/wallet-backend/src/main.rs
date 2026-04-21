@@ -178,7 +178,341 @@ async fn main() {
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any);
 
+    let openapi_json = serde_json::json!({
+        "openapi": "3.0.0",
+        "info": {
+            "title": "Flash Wallet SDK API",
+            "version": "1.0.0",
+            "description": "Custodial Lightning wallet with automatic Bitcoin-to-XOF conversion via Flash API. Built for West Africa (Bénin, Togo, Côte d'Ivoire)."
+        },
+        "servers": [{ "url": "http://localhost:8080" }],
+        "tags": [
+            { "name": "wallet", "description": "Wallet configuration and balance management" },
+            { "name": "transactions", "description": "Bitcoin buy/sell transactions" },
+            { "name": "lightning", "description": "Lightning Address (LNURL-pay)" },
+            { "name": "merchant", "description": "Merchant SDK and webhooks" }
+        ],
+        "paths": {
+            "/api/v1/wallet/configure": {
+                "post": {
+                    "tags": ["wallet"],
+                    "summary": "Configure wallet",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "lightning_address": { "type": "string", "example": "alice@bitcoinflash.xyz" },
+                                        "momo_number": { "type": "string", "example": "+2290197245435" },
+                                        "convert_ratio": { "type": "number", "example": 0.8 }
+                                    },
+                                    "required": ["lightning_address", "momo_number", "convert_ratio"]
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": { "description": "Wallet configured successfully" },
+                        "400": { "description": "Invalid input" }
+                    }
+                }
+            },
+            "/api/v1/wallet": {
+                "get": {
+                    "tags": ["wallet"],
+                    "summary": "Get wallet by Lightning Address",
+                    "parameters": [{
+                        "name": "lightning_address",
+                        "in": "query",
+                        "required": true,
+                        "schema": { "type": "string", "example": "alice@bitcoinflash.xyz" }
+                    }],
+                    "responses": {
+                        "200": { "description": "Wallet found" },
+                        "404": { "description": "Wallet not found" }
+                    }
+                }
+            },
+            "/api/v1/wallet/balance": {
+                "get": {
+                    "tags": ["wallet"],
+                    "summary": "Get real balance from LND",
+                    "parameters": [{
+                        "name": "lightning_address",
+                        "in": "query",
+                        "required": true,
+                        "schema": { "type": "string", "example": "alice@bitcoinflash.xyz" }
+                    }],
+                    "responses": {
+                        "200": {
+                            "description": "Balance from LND",
+                            "content": {
+                                "application/json": {
+                                    "example": {
+                                        "balance_sats": 359615,
+                                        "balance_btc": 0.00359615,
+                                        "momo_number": "+2290197245435",
+                                        "total_received_sats": 600000,
+                                        "total_locked_sats": 240385
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/api/v1/wallet/balance/convert": {
+                "post": {
+                    "tags": ["wallet"],
+                    "summary": "Convert balance to XOF",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "ratio": { "type": "number", "example": 0.5 },
+                                        "lightning_address": { "type": "string", "example": "alice@bitcoinflash.xyz" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": { "description": "Conversion successful" },
+                        "400": { "description": "Conversion failed" }
+                    }
+                }
+            },
+            "/api/v1/transactions": {
+                "get": {
+                    "tags": ["transactions"],
+                    "summary": "List all transactions",
+                    "responses": {
+                        "200": { "description": "List of transactions" }
+                    }
+                }
+            },
+            "/api/v1/transactions/convert": {
+                "post": {
+                    "tags": ["transactions"],
+                    "summary": "Manual SELL_BITCOIN",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "amount_sats": { "type": "integer", "example": 100000 },
+                                        "momo_number": { "type": "string", "example": "+2290197245435" },
+                                        "convert_ratio": { "type": "number", "example": 1.0 }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": { "description": "Transaction created" }
+                    }
+                }
+            },
+            "/api/v1/transactions/buy": {
+                "post": {
+                    "tags": ["transactions"],
+                    "summary": "BUY_BITCOIN with XOF",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "amount_xof": { "type": "integer", "example": 5000 },
+                                        "momo_number": { "type": "string", "example": "+2290197245435" },
+                                        "lightning_address": { "type": "string", "example": "alice@bitcoinflash.xyz" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": { "description": "Transaction created" }
+                    }
+                }
+            },
+            "/api/v1/transactions/{id}/status": {
+                "get": {
+                    "tags": ["transactions"],
+                    "summary": "Get transaction status",
+                    "parameters": [{
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "string" }
+                    }],
+                    "responses": {
+                        "200": { "description": "Transaction status" }
+                    }
+                }
+            },
+            "/.well-known/lnurlp/{username}": {
+                "get": {
+                    "tags": ["lightning"],
+                    "summary": "LNURL-pay metadata (Lightning Address resolution)",
+                    "parameters": [{
+                        "name": "username",
+                        "in": "path",
+                        "required": true,
+                        "schema": { "type": "string", "example": "alice" }
+                    }],
+                    "responses": {
+                        "200": {
+                            "description": "LNURL-pay params",
+                            "content": {
+                                "application/json": {
+                                    "example": {
+                                        "callback": "http://localhost:8080/api/v1/lnurlp/alice/invoice",
+                                        "maxSendable": 100000000,
+                                        "minSendable": 1000,
+                                        "tag": "payRequest"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/api/v1/lnurlp/{username}/invoice": {
+                "get": {
+                    "tags": ["lightning"],
+                    "summary": "Generate Lightning invoice",
+                    "parameters": [
+                        {
+                            "name": "username",
+                            "in": "path",
+                            "required": true,
+                            "schema": { "type": "string", "example": "alice" }
+                        },
+                        {
+                            "name": "amount",
+                            "in": "query",
+                            "required": true,
+                            "schema": { "type": "integer", "example": 50000000 },
+                            "description": "Amount in millisatoshis"
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Lightning invoice",
+                            "content": {
+                                "application/json": {
+                                    "example": {
+                                        "pr": "lnbcrt500u1p5...",
+                                        "routes": []
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/api/v1/merchant/payment": {
+                "post": {
+                    "tags": ["merchant"],
+                    "summary": "Create merchant payment invoice",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "amount_sats": { "type": "integer", "example": 10000 },
+                                        "description": { "type": "string", "example": "Order #123" },
+                                        "lightning_address": { "type": "string", "example": "store@bitcoinflash.xyz" }
+                                    },
+                                    "required": ["amount_sats", "description", "lightning_address"]
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Invoice created",
+                            "content": {
+                                "application/json": {
+                                    "example": {
+                                        "invoice": "lnbcrt100u1p5...",
+                                        "amount_sats": 10000,
+                                        "description": "Order #123",
+                                        "merchant": "store@bitcoinflash.xyz"
+                                    }
+                                }
+                            }
+                        },
+                        "404": { "description": "Merchant wallet not found" }
+                    }
+                }
+            },
+            "/api/v1/merchant/webhook": {
+                "post": {
+                    "tags": ["merchant"],
+                    "summary": "Configure merchant webhook URL",
+                    "requestBody": {
+                        "required": true,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "lightning_address": { "type": "string", "example": "store@bitcoinflash.xyz" },
+                                        "webhook_url": { "type": "string", "example": "https://my-store.com/webhook/flash" }
+                                    },
+                                    "required": ["lightning_address", "webhook_url"]
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": { "description": "Webhook configured successfully" },
+                        "404": { "description": "Merchant wallet not found" }
+                    }
+                }
+            }
+        }
+    });
+
     let app = Router::new()
+        .route("/api-docs/openapi.json", axum::routing::get({
+            let openapi_json = openapi_json.clone();
+            move || async move { axum::Json(openapi_json) }
+        }))
+        .route("/swagger-ui", axum::routing::get(|| async {
+            axum::response::Html(r#"<!DOCTYPE html>
+<html>
+<head>
+  <title>Flash Wallet SDK API</title>
+  <meta charset="utf-8"/>
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+  SwaggerUIBundle({
+    url: "/api-docs/openapi.json",
+    dom_id: '#swagger-ui',
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+    layout: "BaseLayout"
+  });
+</script>
+</body>
+</html>"#)
+        }))
         .merge(transaction_router(
             auto_convert_use_case,
             get_status_use_case,

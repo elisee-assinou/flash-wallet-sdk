@@ -6,11 +6,12 @@ interface Props {
   onConfigure: (input: ConfigureWalletInput) => Promise<any>;
   error?: string | null;
   configuring?: boolean;
+  defaultLightningAddress?: string;
 }
 
-export const WalletConfigForm: React.FC<Props> = ({ onConfigure, error, configuring }) => {
+export const WalletConfigForm: React.FC<Props> = ({ onConfigure, error, configuring, defaultLightningAddress }) => {
   const [form, setForm] = useState({
-    lightningAddress: '',
+    lightningAddress: defaultLightningAddress || '',
     momoNumber: '',
     convertRatio: 1.0,
   });

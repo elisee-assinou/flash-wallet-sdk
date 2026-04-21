@@ -2,7 +2,7 @@ import axios from 'axios';
 import { WalletConfig, ConfigureWalletInput } from '../../domain/entities/WalletConfig';
 import { Balance } from '../../domain/entities/Balance';
 
-const BASE_URL = 'http://localhost:8080/api/v1';
+const BASE_URL = `${process.env.REACT_APP_API_URL || 'http://localhost:8080'}/api/v1`;
 
 const mapWallet = (data: any): WalletConfig => ({
   walletId: data.wallet_id,
@@ -27,18 +27,21 @@ export const walletApi = {
     return mapWallet(data);
   },
 
-  get: async (): Promise<WalletConfig> => {
-    const { data } = await axios.get(`${BASE_URL}/wallet`);
+  get: async (lightningAddress?: string): Promise<WalletConfig> => {
+    const params = lightningAddress ? `?lightning_address=${encodeURIComponent(lightningAddress)}` : '';
+    const { data } = await axios.get(`${BASE_URL}/wallet${params}`);
     return mapWallet(data);
   },
-  getBalance: async (): Promise<Balance> => {
-    const { data } = await axios.get(`${BASE_URL}/wallet/balance`);
+  getBalance: async (lightningAddress?: string): Promise<Balance> => {
+    const params = lightningAddress ? `?lightning_address=${encodeURIComponent(lightningAddress)}` : '';
+    const { data } = await axios.get(`${BASE_URL}/wallet/balance${params}`);
     return mapBalance(data);
   },
 
-  convertBalance: async (ratio: number): Promise<any> => {
+  convertBalance: async (ratio: number, lightningAddress?: string): Promise<any> => {
     const { data } = await axios.post(`${BASE_URL}/wallet/balance/convert`, {
       ratio,
+      lightning_address: lightningAddress,
     });
     return {
       satsConverted: data.sats_converted,

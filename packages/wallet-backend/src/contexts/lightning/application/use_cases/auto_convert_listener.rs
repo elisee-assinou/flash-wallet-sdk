@@ -59,8 +59,6 @@ impl AutoConvertListener {
                 return;
             }
         };
-
-        // 1. Notifie payment.received immédiatement
         if let Some(webhook_url) = wallet.webhook_url() {
             let notifier = self.webhook_notifier.clone();
             let webhook_url = webhook_url.to_string();
@@ -86,7 +84,6 @@ impl AutoConvertListener {
             "Split: {} sats total → {} to convert, {} to keep",
             amount_sats, sats_to_convert, sats_to_keep
         );
-
         if sats_to_keep > 0 {
             match self.balance_repo.credit(&momo_number, sats_to_keep as i64).await {
                 Ok(balance) => tracing::info!(
@@ -96,7 +93,6 @@ impl AutoConvertListener {
                 Err(e) => tracing::error!("Failed to credit balance: {}", e),
             }
         }
-
         if sats_to_convert > 0 {
             let input = AutoConvertInput {
                 amount_sats: sats_to_convert,

@@ -2,29 +2,37 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { walletApi } from '../../infrastructure/api/walletApi';
 import { Balance } from '../../domain/entities/Balance';
 
-export const useBalance = () => {
+export const useBalance = (lightningAddress?: string) => {
   const [balance, setBalance] = useState<Balance | null>(null);
   const [loading, setLoading] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const addressRef = useRef(lightningAddress);
 
   const fetchBalance = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await walletApi.getBalance();
+      const result = await walletApi.getBalance(addressRef.current);
       setBalance(result);
     } catch {
       setBalance(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // pas de dépendance → stable
 
   useEffect(() => {
-    // Fetch initial
+    addressRef.current = lightningAddress;
     fetchBalance();
 
-    // WebSocket pour les mises à jour en temps réel
-    const ws = new WebSocket('ws://localhost:8080/ws/balance');
+    const wsBase = process.env.REACT_APP_API_URL
+      ?.replace('http://', '')
+      .replace('https://', '') || 'localhost:8080';
+
+    const wsUrl = lightningAddress
+      ? `ws://${wsBase}/ws/balance?lightning_address=${encodeURIComponent(lightningAddress)}`
+      : `ws://${wsBase}/ws/balance`;
+
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
@@ -40,16 +48,10 @@ export const useBalance = () => {
       } catch {}
     };
 
-    ws.onerror = () => {
-      // Fallback — polling toutes les 10s si WS échoue
-      const interval = setInterval(fetchBalance, 10000);
-      return () => clearInterval(interval);
-    };
-
     return () => {
       ws.close();
     };
-  }, [fetchBalance]);
+  }, [lightningAddress]); // seulement quand lightningAddress change
 
   return { balance, loading, fetchBalance };
 };

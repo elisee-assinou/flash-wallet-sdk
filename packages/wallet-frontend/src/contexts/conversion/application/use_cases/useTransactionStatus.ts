@@ -8,7 +8,7 @@ export const useTransactionStatus = (transactionId: string | null) => {
   useEffect(() => {
     if (!transactionId) return;
 
-    const ws = new WebSocket(`ws://localhost:8080/ws/transactions/${transactionId}`);
+    const ws = new WebSocket(`ws://${process.env.REACT_APP_API_URL?.replace('http://', '').replace('https://', '') || 'localhost:8080'}/ws/transactions/${transactionId}`);
 
     ws.onopen = () => setConnected(true);
 

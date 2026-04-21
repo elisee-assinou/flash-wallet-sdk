@@ -11,7 +11,7 @@ interface Props {
 }
 
 export const SellForm: React.FC<Props> = ({ wallet, balance, onConvertSuccess }) => {
-  const { execute, loading, error, result } = useConvertBalance();
+  const { execute, loading, error, result } = useConvertBalance(wallet.lightningAddress);
   const [ratio, setRatio] = useState(100);
 
   const availableSats = balance?.balanceSats ?? 0;

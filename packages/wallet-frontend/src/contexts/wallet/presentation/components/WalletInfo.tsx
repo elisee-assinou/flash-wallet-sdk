@@ -11,11 +11,12 @@ interface Props {
   onReconfigure: (input: ConfigureWalletInput) => Promise<any>;
   reconfigureError?: string | null;
   configuring?: boolean;
+  onLogout?: () => void;
 }
 
-export const WalletInfo: React.FC<Props> = ({ wallet, onReconfigure, reconfigureError, configuring }) => {
+export const WalletInfo: React.FC<Props> = ({ wallet, onReconfigure, reconfigureError, configuring, onLogout }) => {
   const [showReconfigure, setShowReconfigure] = useState(false);
-  const { balance, loading, fetchBalance } = useBalance();
+  const { balance, loading, fetchBalance } = useBalance(wallet.lightningAddress);
 
   const username = wallet.lightningAddress.split('@')[0];
   const ourLightningAddress = `${username}@localhost:8080`;
@@ -33,12 +34,22 @@ export const WalletInfo: React.FC<Props> = ({ wallet, onReconfigure, reconfigure
       <div className="bg-gray-900 rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold">Mon Wallet</h2>
-          <button
-            onClick={() => setShowReconfigure(!showReconfigure)}
-            className="text-gray-400 hover:text-yellow-400 transition"
-          >
-            <Settings size={16} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowReconfigure(!showReconfigure)}
+              className="text-gray-400 hover:text-yellow-400 transition"
+            >
+              <Settings size={16} />
+            </button>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="text-gray-400 hover:text-red-400 transition text-xs"
+              >
+                Déconnexion
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3">

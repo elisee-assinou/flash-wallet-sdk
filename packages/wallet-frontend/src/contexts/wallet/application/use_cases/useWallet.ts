@@ -2,15 +2,19 @@ import { useState, useEffect } from 'react';
 import { walletApi } from '../../infrastructure/api/walletApi';
 import { WalletConfig, ConfigureWalletInput } from '../../domain/entities/WalletConfig';
 
-export const useWallet = () => {
+export const useWallet = (lightningAddress?: string) => {
   const [wallet, setWallet] = useState<WalletConfig | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [configuring, setConfiguring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchWallet = async () => {
+    if (!lightningAddress) {
+      setInitialLoading(false);
+      return;
+    }
     try {
-      const result = await walletApi.get();
+      const result = await walletApi.get(lightningAddress);
       setWallet(result);
     } catch {
       setWallet(null);
@@ -36,12 +40,12 @@ export const useWallet = () => {
 
   useEffect(() => {
     fetchWallet();
-  }, []);
+  }, [lightningAddress]);
 
   return {
     wallet,
-    loading: initialLoading,  // seulement pour le chargement initial
-    configuring,              // pour le bouton "Configuration..."
+    loading: initialLoading,
+    configuring,
     error,
     configure,
     fetchWallet,

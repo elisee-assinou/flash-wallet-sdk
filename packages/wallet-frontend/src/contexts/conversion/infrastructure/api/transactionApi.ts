@@ -1,13 +1,13 @@
 import axios from 'axios';
 import { AutoConvertInput, BuyBitcoinInput, Transaction, TransactionStatusResult } from '../../domain/entities/Transaction';
 
-const BASE_URL = 'http://localhost:8080/api/v1';
+const BASE_URL = `${process.env.REACT_APP_API_URL || 'http://localhost:8080'}/api/v1`;
 
 const mapTransaction = (data: any): Transaction => ({
   id: data.id,
   amountSats: data.amount_sats,
   amountXof: data.amount_xof,
-  status: data.status,
+  status: data.status?.toUpperCase() as any,
   message: data.message,
 });
 

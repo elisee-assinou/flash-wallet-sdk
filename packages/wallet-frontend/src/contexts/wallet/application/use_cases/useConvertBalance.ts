@@ -8,7 +8,7 @@ export interface ConvertBalanceOutput {
   message: string;
 }
 
-export const useConvertBalance = () => {
+export const useConvertBalance = (lightningAddress?: string) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ConvertBalanceOutput | null>(null);
@@ -17,11 +17,16 @@ export const useConvertBalance = () => {
     setLoading(true);
     setError(null);
     try {
-      const output = await walletApi.convertBalance(ratio);
+      const output = await walletApi.convertBalance(ratio, lightningAddress);
       setResult(output);
       return output;
     } catch (e: any) {
-      setError(e.response?.data?.error || 'Erreur lors de la conversion');
+      const msg = e.response?.data?.error
+        || e.response?.data
+        || e.message
+        || 'Erreur lors de la conversion';
+      setError(msg);
+      return null;
     } finally {
       setLoading(false);
     }
